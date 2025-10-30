@@ -1,31 +1,117 @@
 import numpy as np
 import cv2
-from my_module.K21999.lecture05_camera_image_capture import MyVideoCapture
 
-def lecture05_01():
+class MyVideoCapture:
+    """Webカメラから映像を取得し、中心にターゲットマークを描画して表示・保存するクラス。
+    Attributes:
+        DELAY (int): 各フレームの表示間隔（ミリ秒）。
+        cap (cv2.VideoCapture): OpenCVのビデオキャプチャオブジェクト。
+        captured_img (np.ndarray | None): 最後にキャプチャされた画像データ。
+    """
+    DELAY: int = 100  # 100 msecのディレイ
 
-    # カメラキャプチャ実行
+    def __init__(self) -> None:
+        """Webカメラを初期化する。
+        Notes:
+            PCによってはカメラIDが0ではなく1で動作する場合があるため、
+            必要に応じて cv2.VideoCapture(1) に変更すること。
+        """
+        print("カメラを初期化しています...")
+        self.cap: cv2.VideoCapture = cv2.VideoCapture(0)
+        if not self.cap.isOpened():
+            print("エラー: カメラを開けませんでした。")
+            return
+            
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.captured_img: np.ndarray | None = None
+        print("カメラの準備ができました。")
+
+    def run(self) -> None:
+        """カメラ映像を取得してリアルタイムに加工・表示する。
+        処理の流れ:
+            1. カメラから1フレームを取得。
+            2. 取得した画像をコピーして加工（中心に赤いターゲットマークを描画）。
+            3. 加工後の画像を左右反転して表示。
+            4. 'q' キーが押されるまで処理を継続。
+        Notes:
+            - フレームの読み込みに失敗した場合（ret=False）、ループを終了する。
+            - 終了時には最後にキャプチャした画像を `captured_img` に保持する。
+        """
+        if not self.cap.isOpened():
+            print("エラー: カメラが初期化されていません。")
+            return
+            
+        print("カメラキャプチャを開始します。'q'キーでキャプチャして終了します。")
+        while True:
+            # カメラ画像を１枚キャプチャする
+            ret, frame = self.cap.read()
+            # リターンコードがFalseなら終了
+            if not ret:
+                break
+
+            # 加工するともとの画像が保存できないのでコピーを生成
+            img: np.ndarray = np.copy(frame)
+            
+            # 画像の中心を示すターゲットマークを描画
+            rows, cols, _ = img.shape
+            center = (int(cols / 2), int(rows / 2))
+            img = cv2.circle(img, center, 30, (0, 0, 255), 3)
+            img = cv2.circle(img, center, 60, (0, 0, 255), 3)
+            img = cv2.line(img, (center[0], center[1] - 80), (center[0], center[1] + 80), (0, 0, 255), 3)
+            img = cv2.line(img, (center[0] - 80, center[1]), (center[0] + 80, center[1]), (0, 0, 255), 3)
+
+            # 左右反転（顔を撮るときは左右反転しておくとよい）
+            img = cv2.flip(img, flipCode=1)
+
+            # 加工した画像を表示
+            cv2.imshow('frame', img)
+
+            # 次の画像を処理するまでに時間間隔（msec）を空ける
+            # キーボードの'q'が押されたら終了
+            if cv2.waitKey(self.DELAY) & 0xFF == ord('q'):
+                self.captured_img = frame # 左右反転や描画がされる前の元画像
+                break
+        
+        print("キャプチャを終了します。")
+
+    def get_img(self) -> np.ndarray | None:
+        """最後にキャプチャされた画像を取得する。
+        Returns:
+            np.ndarray | None: キャプチャされた画像（BGR形式）。未取得の場合は None。
+        """
+        return self.captured_img
+
+    def write_img(self, filepath: str = 'output_images/camera_capture.png') -> None:
+        """キャプチャされた画像をファイルに保存する。
+        Args:
+            filepath (str, optional): 保存先のファイルパス。デフォルトは 'output_images/camera_capture.png'。
+        Raises:
+            ValueError: キャプチャ画像が存在しない場合。
+        """
+        if self.captured_img is None:
+            raise ValueError("キャプチャ画像が存在しません。run()を実行してから保存してください。")
+        
+        # 保存先ディレクトリがなければ作成
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        cv2.imwrite(filepath, self.captured_img)
+        print(f"画像を {filepath} に保存しました。")
+
+    def __del__(self) -> None:
+        """終了処理。カメラリソースを解放し、OpenCVウィンドウを閉じる。"""
+        if hasattr(self, 'cap') and self.cap.isOpened():
+            self.cap.release()
+        cv2.destroyAllWindows()
+        print("カメラリソースを解放しました。")
+
+# (注) if __name__ == "__main__": ブロックは、このファイルを
+# モジュールとして import した時は実行されないので、このままで問題ありません。
+if __name__ == "__main__":
+    import os
     app = MyVideoCapture()
     app.run()
-
-    # 画像をローカル変数に保存
-    google_img : cv2.Mat = cv2.imread('images/google.png')
-    capture_img : cv2.Mat = cv2.imread('images/camera_capture.png') # 動作テスト用なので提出時にこの行を消すこと
-    # capture_img : cv2.Mat = "implement me"
-
-    g_hight, g_width, g_channel = google_img.shape
-    c_hight, c_width, c_channel = capture_img.shape
-    print(google_img.shape)
-    print(capture_img.shape)
-
-    for x in range(g_width):
-        for y in range(g_hight):
-            g, b, r = google_img[y, x]
-            # もし白色(255,255,255)だったら置き換える
-            if (b, g, r) == (255, 255, 255):
-                pass
-                #implement me
-
-    # 書き込み処理
-    # implement me
-
+    
+    if app.get_img() is not None:
+        app.write_img()
+    else:
+        print("画像がキャプチャされませんでした。")
